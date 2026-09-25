@@ -1,0 +1,66 @@
+spring:
+  application:
+    name: UserManagement
+
+  # --- Base de données (JPA standard : changer le driver dans le pom + DB_URL pour changer de SGBD) ---
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    # update : pratique en développement. En production, préférer "validate" + Flyway/Liquibase.
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    open-in-view: false
+    show-sql: false
+
+server:
+  port: ${PORT:9001}
+
+# --- Module IAM (utilisateurs / rôles / permissions) ---
+iam:
+  jwt:
+    # Clé Base64 d'au moins 32 octets. Générer : openssl rand -base64 64
+    secret: ${JWT_SECRET}
+    issuer: ${JWT_ISSUER:${spring.application.name}}
+    access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
+    refresh-token-ttl: ${JWT_REFRESH_TOKEN_TTL:7d}
+
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+    allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,PATCH,DELETE,OPTIONS}
+    allowed-headers: ${CORS_ALLOWED_HEADERS:*}
+    allow-credentials: ${CORS_ALLOW_CREDENTIALS:true}
+
+  security:
+    # Chemins publics additionnels des futurs modules (ex : /api/public/**)
+    public-paths: []
+
+  registration:
+    enabled: ${IAM_REGISTRATION_ENABLED:false}
+    default-role: USER
+
+  bootstrap:
+    enabled: true
+    # Ce rôle reçoit automatiquement TOUTES les permissions (y compris celles des futurs modules).
+    super-admin-role: ADMIN
+    # Rôles créés au premier démarrage. Les permissions ne sont appliquées qu'à la création :
+    # elles se gèrent ensuite via l'API /api/roles.
+    roles:
+      - code: ADMIN
+        name: Administrateur
+        description: Accès complet à l'application
+      - code: USER
+        name: Utilisateur
+        description: Utilisateur standard
+        permissions: []
+    admin:
+      email: ${IAM_ADMIN_EMAIL:admin@gmail.com}
+      # Vide => mot de passe aléatoire affiché une seule fois dans les logs au premier démarrage.
+      password: ${IAM_ADMIN_PASSWORD:}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
