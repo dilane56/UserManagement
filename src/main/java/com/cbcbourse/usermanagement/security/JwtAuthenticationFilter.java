@@ -34,6 +34,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
 
+    /**
+     * Exécuté une fois par requête : si un header "Bearer" est présent et que la requête n'est pas déjà
+     * authentifiée, tente l'authentification, puis passe toujours la main au filtre suivant.
+     */
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -45,6 +49,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    /**
+     * Valide le token, recharge l'utilisateur en base (rôles et permissions à jour) et l'enregistre
+     * dans le contexte de sécurité. En cas d'échec, la raison (token expiré, invalide, compte désactivé...)
+     * est mémorisée dans un attribut de la requête pour que {@link RestAuthenticationEntryPoint}
+     * renvoie un message 401 précis.
+     */
     private void authenticate(String token, HttpServletRequest request) {
         try {
             String email = jwtService.parse(token).getSubject();

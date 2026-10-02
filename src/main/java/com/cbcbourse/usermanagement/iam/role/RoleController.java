@@ -15,6 +15,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Administration des rôles et de leurs permissions. Chaque endpoint exige une permission ROLE_*
+ * vérifiée par {@code @PreAuthorize} (403 sinon) ; les règles métier sont appliquées par {@link RoleService}.
+ * Chaque méthode est décrite par son {@code @Operation} (Swagger).
+ */
 @Tag(name = "Rôles")
 @RestController
 @RequestMapping("/api/roles")

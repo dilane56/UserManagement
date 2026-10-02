@@ -8,6 +8,7 @@ public class ResourceNotFoundException extends ApiException {
         super(HttpStatus.NOT_FOUND, message);
     }
 
+    /** Fabrique un message uniforme, ex : {@code of("Utilisateur", 42)} donne "Utilisateur introuvable : 42". */
     public static ResourceNotFoundException of(String resource, Object identifier) {
         return new ResourceNotFoundException(resource + " introuvable : " + identifier);
     }
