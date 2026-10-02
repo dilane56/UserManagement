@@ -22,6 +22,11 @@ public class JwtService {
     private final IamProperties.Jwt properties;
     private final SecretKey signingKey;
 
+    /**
+     * Prépare la clé de signature HMAC à partir de iam.jwt.secret (JWT_SECRET).
+     * L'application refuse de démarrer si la clé n'est pas du Base64 valide ou fait moins de 256 bits :
+     * mieux vaut une erreur au démarrage qu'une clé faible en production.
+     */
     public JwtService(IamProperties iamProperties) {
         this.properties = iamProperties.getJwt();
         byte[] keyBytes;
@@ -36,6 +41,12 @@ public class JwtService {
         this.signingKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
+    /**
+     * Génère un access token signé pour l'utilisateur.
+     * Contenu : sujet = email, {@code uid} = identifiant, {@code roles} et {@code permissions} (informatifs pour le front),
+     * émetteur et date d'expiration (iam.jwt.access-token-ttl).
+     * Côté serveur, les droits ne sont pas lus dans le token mais rechargés en base à chaque requête.
+     */
     public String generateAccessToken(UserPrincipal user) {
         Instant now = Instant.now();
         return Jwts.builder()
@@ -51,9 +62,10 @@ public class JwtService {
     }
 
     /**
-     * Vérifie la signature, l'émetteur et l'expiration.
+     * Vérifie la signature, l'émetteur et l'expiration, puis renvoie le contenu (claims) du token.
      *
-     * @throws JwtException si le token est invalide
+     * @throws io.jsonwebtoken.ExpiredJwtException si le token est expiré
+     * @throws JwtException                        si le token est invalide (signature, format, émetteur)
      */
     public Claims parse(String token) {
         return Jwts.parser()
@@ -64,6 +76,7 @@ public class JwtService {
                 .getPayload();
     }
 
+    /** Durée de vie d'un access token en secondes, renvoyée au client dans {@code expiresIn}. */
     public long getAccessTokenTtlSeconds() {
         return properties.getAccessTokenTtl().toSeconds();
     }

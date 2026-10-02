@@ -29,7 +29,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
             """)
     Page<User> search(String term, Pageable pageable);
 
+    /** Indique si au moins un utilisateur possède ce rôle (empêche la suppression d'un rôle utilisé). */
     boolean existsByRolesId(Long roleId);
 
+    /** Nombre de comptes actifs ayant ce rôle (sert à protéger le dernier administrateur). */
     long countByRolesCodeAndEnabledTrue(String roleCode);
 }

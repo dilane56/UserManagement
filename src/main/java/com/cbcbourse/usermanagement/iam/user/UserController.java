@@ -14,6 +14,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Administration des utilisateurs. Chaque endpoint exige une permission USER_* vérifiée par {@code @PreAuthorize}
+ * (403 sinon) ; les règles métier sont appliquées par {@link UserService}.
+ * Chaque méthode est décrite par son {@code @Operation} (Swagger).
+ */
 @Tag(name = "Utilisateurs")
 @RestController
 @RequestMapping("/api/users")

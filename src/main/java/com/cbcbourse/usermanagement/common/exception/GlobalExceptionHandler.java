@@ -24,15 +24,23 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Convertit toutes les exceptions levées par les contrôleurs en une {@link ErrorResponse} JSON homogène.
+ * Les modules métier n'ont rien à ajouter : il leur suffit de lever une {@link ApiException}
+ * (ou une sous-classe) avec le bon statut HTTP. Les erreurs imprévues sont journalisées
+ * et renvoyées en 500 avec un message générique, sans détail technique.
+ */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /** Erreurs métier : le statut et le message sont portés par l'exception elle-même. */
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> handleApiException(ApiException ex, HttpServletRequest request) {
         return build(ex.getStatus(), ex.getMessage(), request);
     }
 
+    /** Échec de validation d'un corps de requête ({@code @Valid}) : 400 avec le premier message d'erreur par champ. */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> fieldErrors = new LinkedHashMap<>();

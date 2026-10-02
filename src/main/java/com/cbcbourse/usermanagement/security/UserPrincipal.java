@@ -45,6 +45,10 @@ public class UserPrincipal implements UserDetails, CredentialsContainer {
         this.authorities = Collections.unmodifiableList(grantedAuthorities);
     }
 
+    /**
+     * Construit le principal à partir de l'entité : les permissions effectives sont l'union
+     * des permissions de tous les rôles de l'utilisateur. Les rôles et permissions doivent être chargés.
+     */
     public static UserPrincipal from(User user) {
         Set<String> roles = new TreeSet<>();
         Set<String> permissions = new TreeSet<>();

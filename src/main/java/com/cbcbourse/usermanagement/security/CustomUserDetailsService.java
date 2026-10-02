@@ -15,6 +15,12 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     private final UserRepository userRepository;
 
+    /**
+     * Charge un utilisateur par son email avec ses rôles et permissions en une seule requête.
+     * Appelée au login (via Spring Security) et à chaque requête authentifiée (via le filtre JWT).
+     *
+     * @throws UsernameNotFoundException si aucun compte ne correspond (traduit en 401, sans préciser la cause)
+     */
     @Override
     @Transactional(readOnly = true)
     public UserPrincipal loadUserByUsername(String username) throws UsernameNotFoundException {

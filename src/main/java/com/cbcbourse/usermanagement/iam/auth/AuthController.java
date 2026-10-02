@@ -10,6 +10,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Endpoints d'authentification et du compte de l'utilisateur connecté.
+ * login, refresh, logout et register sont publics (voir SecurityConfig) ; les routes /me exigent
+ * seulement d'être authentifié, sans permission particulière.
+ * La logique est dans {@link AuthService} ; chaque méthode est décrite par son {@code @Operation} (Swagger).
+ */
 @Tag(name = "Authentification")
 @RestController
 @RequestMapping("/api/auth")

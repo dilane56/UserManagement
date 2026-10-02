@@ -43,12 +43,19 @@ public class SecurityConfig {
     private final IamProperties iamProperties;
     private final RestAuthenticationEntryPoint restAuthenticationEntryPoint;
 
+    /**
+     * Encodeur des mots de passe. Délégant ({bcrypt} par défaut) : chaque hash porte le nom de son algorithme,
+     * ce qui permet de changer d'algorithme plus tard sans casser les mots de passe existants.
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // Encodeur délégant ({bcrypt} par défaut) : permet de changer d'algorithme sans casser les hash existants.
         return PasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
+    /**
+     * Gestionnaire utilisé par le login : charge l'utilisateur par email, compare le mot de passe
+     * et refuse les comptes désactivés (DisabledException).
+     */
     @Bean
     public AuthenticationManager authenticationManager(CustomUserDetailsService userDetailsService,
                                                        PasswordEncoder passwordEncoder) {
@@ -57,6 +64,11 @@ public class SecurityConfig {
         return new ProviderManager(provider);
     }
 
+    /**
+     * Chaîne de sécurité HTTP : API sans état (pas de session), CORS, routes publiques, toutes les autres
+     * routes authentifiées, réponses 401/403 en JSON et filtre JWT placé avant l'authentification standard.
+     * Le contrôle fin des droits se fait ensuite sur chaque endpoint avec {@code @PreAuthorize}.
+     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtService jwtService,
                                            CustomUserDetailsService userDetailsService) throws Exception {
@@ -79,6 +91,7 @@ public class SecurityConfig {
                 .build();
     }
 
+    /** Règles CORS (origines, méthodes, headers autorisés) lues dans iam.cors.*, appliquées à toutes les routes. */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         IamProperties.Cors props = iamProperties.getCors();

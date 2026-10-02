@@ -47,6 +47,11 @@ public class IamDataInitializer implements ApplicationRunner {
     private final UserService userService;
     private final IamProperties iamProperties;
 
+    /**
+     * Point d'entrée exécuté une fois au démarrage, dans une seule transaction :
+     * si une étape échoue (ex : rôle de départ référençant une permission inconnue), rien n'est enregistré
+     * et le démarrage s'arrête avec l'erreur.
+     */
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
@@ -56,6 +61,12 @@ public class IamDataInitializer implements ApplicationRunner {
         seedAdmin(superAdmin);
     }
 
+    /**
+     * Aligne la table des permissions sur les permissions déclarées dans le code par les {@link PermissionProvider}.
+     * Les nouvelles sont créées et la description et le module des existantes sont mis à jour.
+     * Une permission retirée du code n'est pas supprimée (elle peut encore être liée à des rôles) :
+     * un avertissement est seulement journalisé.
+     */
     private void syncPermissions() {
         Map<String, PermissionDefinition> declared = new LinkedHashMap<>();
         for (PermissionProvider provider : permissionProviders) {
@@ -87,6 +98,11 @@ public class IamDataInitializer implements ApplicationRunner {
                 .forEach(code -> log.warn("Permission {} présente en base mais plus déclarée dans le code", code));
     }
 
+    /**
+     * Crée les rôles listés dans iam.bootstrap.roles s'ils n'existent pas encore (marqués « système »).
+     * Les permissions de la configuration ne s'appliquent qu'à la création : un rôle existant n'est jamais modifié,
+     * afin de ne pas écraser les ajustements faits ensuite via l'API.
+     */
     private void seedRoles() {
         for (IamProperties.RoleSeed seed : iamProperties.getBootstrap().getRoles()) {
             String code = RoleService.normalizeCode(seed.getCode());
@@ -100,6 +116,10 @@ public class IamDataInitializer implements ApplicationRunner {
         }
     }
 
+    /**
+     * Garantit que le rôle super-administrateur existe et possède toutes les permissions connues,
+     * y compris celles ajoutées par un nouveau module depuis le dernier démarrage.
+     */
     private Role syncSuperAdminRole() {
         String code = RoleService.normalizeCode(iamProperties.getBootstrap().getSuperAdminRole());
         Role role = roleRepository.findByCode(code).orElseGet(() -> {
@@ -111,6 +131,12 @@ public class IamDataInitializer implements ApplicationRunner {
         return role;
     }
 
+    /**
+     * Crée le premier administrateur (iam.bootstrap.admin) uniquement s'il n'existe aucun administrateur actif.
+     * Si le compte configuré existe déjà, il retrouve le rôle super-administrateur et est réactivé :
+     * c'est la procédure de secours en cas de perte de tous les comptes admin.
+     * Sans mot de passe configuré, un mot de passe aléatoire est généré et affiché une seule fois dans les logs.
+     */
     private void seedAdmin(Role superAdmin) {
         if (userRepository.countByRolesCodeAndEnabledTrue(superAdmin.getCode()) > 0) {
             return;
@@ -151,6 +177,7 @@ public class IamDataInitializer implements ApplicationRunner {
         }
     }
 
+    /** Mot de passe aléatoire de 16 caractères (sans caractères ambigus comme 0/O ou 1/l), généré par SecureRandom. */
     private static String generatePassword() {
         final String alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#%&*";
         SecureRandom random = new SecureRandom();

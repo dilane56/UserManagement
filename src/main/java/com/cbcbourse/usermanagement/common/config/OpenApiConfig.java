@@ -14,6 +14,10 @@ public class OpenApiConfig {
 
     private static final String BEARER_SCHEME = "bearerAuth";
 
+    /**
+     * Description de l'API pour Swagger UI : titre tiré de spring.application.name et schéma
+     * d'authentification "Bearer JWT" (bouton « Authorize » pour tester les routes protégées).
+     */
     @Bean
     public OpenAPI customOpenAPI(@Value("${spring.application.name}") String applicationName) {
         return new OpenAPI()

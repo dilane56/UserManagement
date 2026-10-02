@@ -24,6 +24,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+/**
+ * Gestion des comptes utilisateurs : recherche, création, modification, rôles, statut et suppression.
+ * Les contrôles d'autorisation (permissions USER_*) sont faits dans le contrôleur ; ce service applique
+ * les règles métier (unicité de l'email, protection du dernier administrateur, etc.).
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -36,6 +41,11 @@ public class UserService {
     private final UserMapper userMapper;
     private final IamProperties iamProperties;
 
+    /**
+     * Recherche paginée des utilisateurs.
+     * Si {@code search} est renseigné, filtre (sans tenir compte de la casse) sur l'email, le nom ou le prénom ;
+     * sinon renvoie tous les utilisateurs. Le tri et la taille de page viennent de {@code pageable}.
+     */
     @Transactional(readOnly = true)
     public PageResponse<UserResponse> search(String search, Pageable pageable) {
         Page<User> page = (search == null || search.isBlank())
@@ -44,11 +54,21 @@ public class UserService {
         return PageResponse.from(page.map(userMapper::toResponse));
     }
 
+    /**
+     * Renvoie un utilisateur par son identifiant.
+     *
+     * @throws ResourceNotFoundException si aucun utilisateur ne porte cet identifiant (404)
+     */
     @Transactional(readOnly = true)
     public UserResponse findById(Long id) {
         return userMapper.toResponse(getUser(id));
     }
 
+    /**
+     * Renvoie un utilisateur par son email (comparaison insensible à la casse et aux espaces).
+     *
+     * @throws ResourceNotFoundException si aucun compte n'utilise cet email (404)
+     */
     @Transactional(readOnly = true)
     public UserResponse findByEmail(String email) {
         String normalized = normalizeEmail(email);
@@ -57,6 +77,10 @@ public class UserService {
                 .orElseThrow(() -> ResourceNotFoundException.of("Utilisateur", normalized));
     }
 
+    /**
+     * Création d'un compte par un administrateur (POST /api/users).
+     * Délègue à {@link #createAccount} et renvoie la représentation publique (sans mot de passe).
+     */
     public UserResponse create(UserCreateRequest request) {
         User user = createAccount(request.nom(), request.prenom(), request.email(), request.password(), request.roles());
         return userMapper.toResponse(user);
@@ -85,6 +109,12 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    /**
+     * Met à jour le nom, le prénom et l'email d'un utilisateur.
+     * Les rôles, le statut et le mot de passe ont leurs propres méthodes dédiées.
+     *
+     * @throws ConflictException si le nouvel email est déjà utilisé par un autre compte (409)
+     */
     public UserResponse update(Long id, UserUpdateRequest request) {
         User user = getUser(id);
         String email = normalizeEmail(request.email());
@@ -97,6 +127,14 @@ public class UserService {
         return userMapper.toResponse(user);
     }
 
+    /**
+     * Active ou désactive un compte.
+     * Un compte désactivé ne peut plus se connecter, ses refresh tokens sont révoqués et ses access tokens
+     * en cours sont refusés dès la requête suivante (les droits sont relus en base à chaque appel).
+     *
+     * @throws BadRequestException si l'utilisateur tente de se désactiver lui-même
+     *                             ou s'il s'agit du dernier administrateur actif (400)
+     */
     public UserResponse updateStatus(Long id, boolean enabled) {
         User user = getUser(id);
         if (!enabled) {
@@ -108,6 +146,13 @@ public class UserService {
         return userMapper.toResponse(user);
     }
 
+    /**
+     * Remplace l'ensemble des rôles d'un utilisateur par ceux fournis (les rôles absents sont retirés).
+     * Le changement de droits prend effet immédiatement, sans attendre un nouveau token.
+     *
+     * @throws BadRequestException si un code de rôle est inconnu, ou si l'opération retirerait le rôle
+     *                             super-administrateur au dernier administrateur actif (400)
+     */
     public UserResponse replaceRoles(Long id, Set<String> roleCodes) {
         User user = getUser(id);
         Set<Role> roles = roleService.resolveRoles(roleCodes);
@@ -119,12 +164,22 @@ public class UserService {
         return userMapper.toResponse(user);
     }
 
+    /**
+     * Réinitialisation du mot de passe par un administrateur (sans connaître l'ancien).
+     * Toutes les sessions de l'utilisateur (refresh tokens) sont révoquées par sécurité.
+     */
     public void resetPassword(Long id, String newPassword) {
         User user = getUser(id);
         user.setPassword(passwordEncoder.encode(newPassword));
         refreshTokenService.revokeAll(user);
     }
 
+    /**
+     * Supprime définitivement un utilisateur et ses refresh tokens.
+     *
+     * @throws BadRequestException si l'utilisateur tente de se supprimer lui-même
+     *                             ou s'il s'agit du dernier administrateur actif (400)
+     */
     public void delete(Long id) {
         User user = getUser(id);
         ensureNotCurrentUser(user, "supprimer votre propre compte");
@@ -133,6 +188,12 @@ public class UserService {
         userRepository.delete(user);
     }
 
+    /**
+     * Normalise un email (espaces retirés, minuscules) pour garantir l'unicité quelle que soit la saisie :
+     * "Jean@Mail.com " et "jean@mail.com" désignent le même compte.
+     *
+     * @throws BadRequestException si l'email est vide (400)
+     */
     public static String normalizeEmail(String email) {
         if (email == null || email.isBlank()) {
             throw new BadRequestException("Email obligatoire");
@@ -140,10 +201,12 @@ public class UserService {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
+    /** Charge l'entité ou lève une 404. */
     private User getUser(Long id) {
         return userRepository.findById(id).orElseThrow(() -> ResourceNotFoundException.of("Utilisateur", id));
     }
 
+    /** Interdit à l'utilisateur connecté d'effectuer l'action décrite par {@code action} sur son propre compte. */
     private void ensureNotCurrentUser(User user, String action) {
         SecurityUtils.currentUser()
                 .filter(current -> current.getId().equals(user.getId()))
